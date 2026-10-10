@@ -18,6 +18,10 @@ class TrendConfig:
     initial_equity: float = 10_000.0
     response_kind: str = "tanh"
     position_mode: str = "long_short"
+    correlation_window: int = 180
+    correlation_min_observations: int = 100
+    correlation_rebuild_days: int = 7
+    correlation_shrinkage: float = 0.30
 
     def validate(self) -> None:
         if not self.speeds or any(f <= 0 or s <= f for f, s in self.speeds):
@@ -36,6 +40,10 @@ class TrendConfig:
             raise ValueError("unknown response_kind")
         if self.position_mode not in {"long_short", "long_only", "short_only"}:
             raise ValueError("unknown position_mode")
+        if self.correlation_window < 20 or self.correlation_min_observations < 20:
+            raise ValueError("correlation windows are too short")
+        if self.correlation_rebuild_days < 1 or not 0 <= self.correlation_shrinkage <= 1:
+            raise ValueError("invalid correlation settings")
 
     def to_dict(self) -> dict:
         return asdict(self)

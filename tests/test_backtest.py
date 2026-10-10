@@ -36,7 +36,16 @@ class BacktestTests(unittest.TestCase):
         )
         self.assertLessEqual(float(result.daily["gross_exposure"].max()), 1.2500001)
 
+    def test_disappearing_market_is_marked_to_final_close(self):
+        index = pd.date_range("2018-01-01", periods=1100, freq="D", tz="UTC")
+        open_frame = self.open.copy()
+        close_frame = self.close.copy()
+        open_frame.loc[index[-2]:, "ETH"] = np.nan
+        close_frame.loc[index[-1]:, "ETH"] = np.nan
+        result = run_backtest(open_frame, close_frame, TrendConfig(cost_bps=10))
+        self.assertTrue(np.isfinite(result.daily.to_numpy()).all())
+        self.assertEqual(float(result.positions["ETH"].iloc[-1]), 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
-

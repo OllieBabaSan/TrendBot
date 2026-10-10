@@ -33,6 +33,15 @@ class SignalTests(unittest.TestCase):
         self.assertLess(float(short_only.iloc[0, 0]), 0.0)
         self.assertEqual(float(short_only.iloc[1, 0]), 0.0)
 
+    def test_fast_horizon_can_trade_before_slowest_is_ready(self):
+        index = pd.date_range("2020-01-01", periods=170, freq="D", tz="UTC")
+        wave = 0.02 * np.sin(np.arange(len(index)) / 5)
+        close = pd.DataFrame(
+            {"YOUNG": np.exp(np.linspace(4, 5, len(index)) + wave)}, index=index
+        )
+        signal = trend_signal(close, TrendConfig())
+        self.assertTrue(signal["YOUNG"].iloc[120:170].notna().any())
+
 
 if __name__ == "__main__":
     unittest.main()

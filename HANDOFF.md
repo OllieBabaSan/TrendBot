@@ -27,25 +27,31 @@ These values are a frozen starting hypothesis, not optimized TrendBot settings.
 
 - Core research engine, Binance monthly archive fetcher/parser, CSV loader,
   chronological evaluator, market attribution, and ablation runner implemented.
-- Nine tests pass, covering causal timing, position modes, positive trend
+- Eleven tests pass, covering causal timing, position modes, positive trend
   response, deterministic accounting, cost drag, gross-cap enforcement,
-  archive parsing, prior-day eligibility, and disjoint chronological splits.
+  archive parsing, prior-day eligibility, disjoint chronological splits,
+  fast-horizon availability for young markets, and delisting marks/exits.
 - An initial BTC/ETH/SOL 2023-2025 engineering smoke test is documented in
-  `docs\INITIAL_SMOKE_TEST.md`. The baseline failed its 2025 untouched-test
-  gate (-6.07%) and is not a validated candidate.
+  `docs\INITIAL_SMOKE_TEST.md`. Its original figures were superseded after a
+  fast-horizon availability mismatch was corrected; the corrected 2025 test
+  was still negative (-3.73%). It is not a validated candidate.
+- A 638-market point-in-time 2020-2025 baseline and structural ablations are
+  documented in `docs\FULL_UNIVERSE_BASELINE.md`. The aggregate result is
+  promising (+194.02%, Sharpe 0.92), but 2023 lost 19.26%, so it fails the
+  positive-validation gate and is not approved for paper trading.
 - No scheduled task or resident process exists.
 
 ## Next work
 
-1. Extend collection from the three-market smoke cohort to a point-in-time
-   liquid perpetual universe, including delisted contracts.
-2. Add portfolio correlation shrinkage/clustering and compare it with the
-   current rolling sample-covariance risk target.
-3. Add attribution by regime, month, and best contributors plus explicit
+1. Add portfolio correlation clustering/equal cluster-risk allocation and
+   compare it with the current shrunk-correlation risk target.
+2. Complete funding-coverage, monthly/regime, liquidity-threshold, and
+   leverage-cap diagnostics.
+3. Compare the fully reproduced reference construction with the simplified
+   TrendBot baseline using identical dates and eligibility.
+4. Add attribution by regime, month, and best contributors plus explicit
    concentration gates.
-4. Add missing-data, funding-sign, delayed-fill, correlation-spike, and
+5. Add missing-data, funding-sign, delayed-fill, correlation-spike, and
    accounting invariance tests.
-5. Reproduce the remaining exposed reference architecture before introducing
-   strategy changes.
-6. Repeat predeclared ablations on the full point-in-time universe.
-7. Start a forward paper lane only if untouched historical gates pass.
+6. Start a forward paper lane only if the final candidate passes the declared
+   historical and robustness gates.

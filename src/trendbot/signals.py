@@ -31,7 +31,11 @@ def trend_signal(close: pd.DataFrame, config: TrendConfig) -> pd.DataFrame:
             min_periods=config.signal_scale_min_periods,
         ).std()
         components.append(normalized / scale.replace(0.0, np.nan))
-    combined = sum(components) / len(components)
+    # Average whichever horizons are presently available. Requiring the
+    # slowest component would impose an unintended 192-day listing-age gate
+    # and contradict the reference design's young-market behavior.
+    stacked = pd.concat(components, axis=0, keys=range(len(components)))
+    combined = stacked.groupby(level=1).mean().reindex(close.index)
     return combined.shift(1)
 
 

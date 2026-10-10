@@ -3,6 +3,9 @@
 Date: 2026-10-10
 
 This is an engineering and directional smoke test, not strategy validation.
+Its figures are superseded by the corrected fast-horizon availability and
+weekly-correlation implementation plus the full-universe report in
+`FULL_UNIVERSE_BASELINE.md`.
 It uses only BTCUSDT, ETHUSDT, and SOLUSDT Binance perpetual daily data from
 2023 through 2025. The small survivor-selected cohort is unsuitable for a
 final expectancy conclusion.
@@ -55,4 +58,3 @@ its short exposure responsible for most of its gross loss.
 No baseline change is approved from this smoke test. The correct next step is
 reproduction on a point-in-time liquid universe with delisted contracts, then
 chronological robustness and contributor-dependence analysis.
-
