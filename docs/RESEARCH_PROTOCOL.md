@@ -32,6 +32,16 @@ as a realizable account.
 6. Begin forward paper observation only after an untouched historical result
    passes predeclared gates.
 
+## Venue portability
+
+The user does not have Binance trading access. Binance data may provide broad
+historical discovery evidence, but Binance is not the intended execution venue
+or foundation of the system. A surviving strategy must be reproduced on an
+accessible target venue before paper promotion, including venue-specific
+listing history, symbol and contract mapping, funding, liquidity, fees,
+minimum-order rules, price increments, and fill assumptions. A result that
+exists only on Binance data is not sufficient.
+
 ## Initial gates
 
 These are screening requirements, not proof of future profitability:
@@ -52,4 +62,3 @@ These are screening requirements, not proof of future profitability:
 - no same-bar signal and fill;
 - no parameter changes prompted by a handful of forward trades;
 - no promotion based solely on an attractive aggregate backtest.
-

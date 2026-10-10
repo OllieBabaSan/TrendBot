@@ -11,6 +11,16 @@ Updated: 2026-10-10
 - Mode: research/backtest only.
 - Live execution: unavailable by design.
 
+## Venue constraint
+
+The user does not have Binance trading access. Binance archives are a broad
+historical research source only. Binance must not become TrendBot's execution
+foundation, live operational dependency, or authority for the eventual
+tradable universe. Any candidate that survives discovery must be reproduced on
+an accessible intended execution venue using that venue's instruments,
+liquidity, funding, fees, order rules, and executable fills before forward
+paper promotion.
+
 ## Initial candidate
 
 - Daily bars with signals lagged before next-open execution.

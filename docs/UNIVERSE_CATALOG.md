@@ -26,6 +26,11 @@ This is a source catalog, not a recommended or executable trading universe. It
 contains multiple quote assets, multiplier contracts, short-lived contracts,
 and markets that will fail history or liquidity gates.
 
+The user does not have Binance trading access. This catalog supplies historical
+research breadth only and does not define TrendBot's eventual venue or
+executable universe. Any selected candidate must be reconstructed and
+paper-tested with an accessible venue's own data and trading rules.
+
 Eligibility will be evaluated independently on every historical day using only
 information available before that day's execution:
 
@@ -46,4 +51,3 @@ because its eventual return is known.
   missing, or error status, byte count, and SHA-256 hash when present.
 - The manifest is written only after complete discovery; partial enumeration is
   not accepted as a valid universe.
-
