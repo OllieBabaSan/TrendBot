@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trendbot"
+version = "0.1.0"
+description = "Paper-only crypto trend-following research system"
+requires-python = ">=3.11"
+dependencies = ["numpy>=2.0", "pandas>=2.2"]
+
+[project.scripts]
+trendbot = "trendbot.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
