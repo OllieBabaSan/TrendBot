@@ -1,7 +1,0 @@
-Metadata-Version: 2.4
-Name: trendbot
-Version: 0.1.0
-Summary: Paper-only crypto trend-following research system
-Requires-Python: >=3.11
-Requires-Dist: numpy>=2.0
-Requires-Dist: pandas>=2.2
