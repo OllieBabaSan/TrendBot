@@ -7,6 +7,11 @@ from dataclasses import asdict, dataclass
 class TrendConfig:
     speeds: tuple[tuple[int, int], ...] = ((16, 48), (32, 96), (64, 192))
     vol_window: int = 60
+    vol_short_min_periods: int = 60
+    vol_long_window: int = 3650
+    vol_long_min_periods: int = 60
+    vol_blend_short: float = 0.70
+    vol_forecast: str = "short"
     vol_floor_annual: float = 0.20
     signal_scale_window: int = 365
     signal_scale_min_periods: int = 60
@@ -22,12 +27,22 @@ class TrendConfig:
     correlation_min_observations: int = 100
     correlation_rebuild_days: int = 7
     correlation_shrinkage: float = 0.30
+    use_cluster_weights: bool = False
+    n_clusters: int = 8
 
     def validate(self) -> None:
         if not self.speeds or any(f <= 0 or s <= f for f, s in self.speeds):
             raise ValueError("each trend speed must satisfy 0 < fast < slow")
         if self.vol_window < 2 or self.signal_scale_min_periods < 2:
             raise ValueError("rolling windows are too short")
+        if self.vol_short_min_periods < 2 or self.vol_long_min_periods < 2:
+            raise ValueError("volatility minimum periods are too short")
+        if self.vol_long_window < self.vol_long_min_periods:
+            raise ValueError("long volatility window is shorter than its minimum periods")
+        if not 0 <= self.vol_blend_short <= 1:
+            raise ValueError("vol_blend_short must be in [0, 1]")
+        if self.vol_forecast not in {"short", "long", "blend", "ewma"}:
+            raise ValueError("unknown vol_forecast")
         if self.vol_floor_annual <= 0 or self.target_vol_annual <= 0:
             raise ValueError("volatility settings must be positive")
         if self.max_gross_leverage <= 0:
@@ -44,6 +59,8 @@ class TrendConfig:
             raise ValueError("correlation windows are too short")
         if self.correlation_rebuild_days < 1 or not 0 <= self.correlation_shrinkage <= 1:
             raise ValueError("invalid correlation settings")
+        if self.n_clusters < 1:
+            raise ValueError("n_clusters must be positive")
 
     def to_dict(self) -> dict:
         return asdict(self)

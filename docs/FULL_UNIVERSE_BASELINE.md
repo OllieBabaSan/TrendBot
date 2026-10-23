@@ -1,5 +1,11 @@
 # Point-in-time universe baseline
 
+> Accounting update (2026-10-10): holdings now drift with market returns and
+> temporary missing opens freeze execution while preserving gap P&L. The
+> corrected baseline is +194.45%, Sharpe 0.931, maximum drawdown -29.26%, and
+> 2023 -19.49%. See `docs\REFERENCE_REPRODUCTION.md`. Figures below preserve
+> the original run for audit history.
+
 Date: 2026-10-10
 
 ## Scope and limitations
@@ -19,9 +25,9 @@ The chronological labels below describe data flow, not prior ignorance.
 
 | Metric | Result |
 |---|---:|
-| Total return | +194.02% |
-| CAGR | +19.68% |
-| Net Sharpe | 0.92 |
+| Total return | +193.87% |
+| CAGR | +19.67% |
+| Net Sharpe | 0.920 |
 | Maximum drawdown | -29.22% |
 | Annual turnover | 11.23x |
 | Cost drag | 6.74% of starting capital |
@@ -31,10 +37,11 @@ The chronological labels below describe data flow, not prior ignorance.
 |---|---|---:|
 | 2020-2022 | design | +144.21% |
 | 2023 | validation | -19.26% |
-| 2024-2025 | chronological holdout | +49.12% |
+| 2024-2025 | chronological holdout | +49.05% |
 
 Annual returns were +43.52%, +30.91%, +29.97%, -19.26%, +14.37%, and
-+30.39% from 2020 through 2025 respectively.
++30.32% from 2020 through 2025 respectively. These are the corrected figures
+after applying the gross-exposure ceiling to the post-buffer held book.
 
 The baseline fails the predeclared requirement for positive validation and
 test performance because 2023 is materially negative.

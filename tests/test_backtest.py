@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from trendbot.backtest import run_backtest
+from trendbot.backtest import forward_mark_returns, run_backtest
 from trendbot.config import TrendConfig
 
 
@@ -36,6 +36,18 @@ class BacktestTests(unittest.TestCase):
         )
         self.assertLessEqual(float(result.daily["gross_exposure"].max()), 1.2500001)
 
+    def test_held_book_cap_survives_buffering(self):
+        result = run_backtest(
+            self.open,
+            self.close,
+            TrendConfig(
+                target_vol_annual=2.0,
+                max_gross_leverage=0.30,
+                rebalance_buffer=0.40,
+            ),
+        )
+        self.assertLessEqual(float(result.daily["gross_exposure"].max()), 0.3000001)
+
     def test_disappearing_market_is_marked_to_final_close(self):
         index = pd.date_range("2018-01-01", periods=1100, freq="D", tz="UTC")
         open_frame = self.open.copy()
@@ -45,6 +57,23 @@ class BacktestTests(unittest.TestCase):
         result = run_backtest(open_frame, close_frame, TrendConfig(cost_bps=10))
         self.assertTrue(np.isfinite(result.daily.to_numpy()).all())
         self.assertEqual(float(result.positions["ETH"].iloc[-1]), 0.0)
+
+    def test_temporary_missing_open_carries_gap_return(self):
+        index = pd.date_range("2024-01-01", periods=4, freq="D", tz="UTC")
+        opens = pd.DataFrame({"X": [100.0, np.nan, 120.0, 126.0]}, index=index)
+        closes = pd.DataFrame({"X": [105.0, np.nan, 123.0, 126.0]}, index=index)
+        forward, terminal = forward_mark_returns(opens, closes)
+        self.assertAlmostEqual(float(forward.iloc[0, 0]), 0.05)
+        self.assertAlmostEqual(float(forward.iloc[1, 0]), 120.0 / 105.0 - 1.0)
+        self.assertFalse(bool(terminal.iloc[0, 0]))
+
+    def test_final_observation_is_the_only_terminal_mark(self):
+        index = pd.date_range("2024-01-01", periods=4, freq="D", tz="UTC")
+        opens = pd.DataFrame({"X": [100.0, 110.0, np.nan, np.nan]}, index=index)
+        closes = pd.DataFrame({"X": [105.0, 108.0, np.nan, np.nan]}, index=index)
+        _, terminal = forward_mark_returns(opens, closes)
+        self.assertFalse(bool(terminal.iloc[0, 0]))
+        self.assertTrue(bool(terminal.iloc[1, 0]))
 
 
 if __name__ == "__main__":

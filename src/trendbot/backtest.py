@@ -7,6 +7,7 @@ import pandas as pd
 
 from .config import TrendConfig
 from .signals import annualized_volatility, response, trend_signal
+from .clustering import average_linkage_labels, equal_cluster_risk_multipliers
 
 
 @dataclass
@@ -15,6 +16,51 @@ class BacktestResult:
     positions: pd.DataFrame
     metrics: dict[str, float]
     attribution: pd.DataFrame
+
+
+def forward_mark_returns(
+    opens: pd.DataFrame, closes: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Open-to-next-mark returns and retrospective terminal settlements.
+
+    Missing opens freeze execution but not economic exposure. A current close
+    supplies that day's mark and a later resumed open captures the intervening
+    gap. A market is terminal only after its final observable open; using the
+    future availability here determines settlement accounting, never a signal.
+    """
+    open_values = opens.to_numpy(dtype=float)
+    close_values = closes.to_numpy(dtype=float)
+    returns = np.full_like(open_values, np.nan, dtype=float)
+    terminal = np.zeros_like(open_values, dtype=bool)
+    mark = np.full(open_values.shape[1], np.nan, dtype=float)
+    future_open = np.zeros_like(open_values, dtype=bool)
+    seen = np.zeros(open_values.shape[1], dtype=bool)
+    for row in range(len(opens) - 1, -1, -1):
+        future_open[row] = seen
+        seen |= np.isfinite(open_values[row])
+    for row in range(len(opens)):
+        has_open = np.isfinite(open_values[row])
+        mark = np.where(has_open, open_values[row], mark)
+        next_open = (
+            np.isfinite(open_values[row + 1])
+            if row + 1 < len(opens)
+            else np.zeros(open_values.shape[1], dtype=bool)
+        )
+        end_mark = (
+            np.where(next_open, open_values[row + 1], mark)
+            if row + 1 < len(opens)
+            else mark.copy()
+        )
+        has_close = np.isfinite(close_values[row])
+        end_mark = np.where(~next_open & has_close, close_values[row], end_mark)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            returns[row] = end_mark / mark - 1.0
+        terminal[row] = has_open & has_close & ~future_open[row]
+        mark = end_mark
+    return (
+        pd.DataFrame(returns, index=opens.index, columns=opens.columns),
+        pd.DataFrame(terminal, index=opens.index, columns=opens.columns),
+    )
 
 
 def _target_weights(
@@ -35,6 +81,7 @@ def _target_weights(
     targets = pd.DataFrame(0.0, index=close.index, columns=close.columns)
     cached_correlation: np.ndarray | None = None
     cached_columns = np.zeros(0, dtype=int)
+    cached_labels: np.ndarray | None = None
     last_rebuild = -10**9
     for i in range(len(close)):
         vector = raw.iloc[i].to_numpy(dtype=float, copy=True)
@@ -62,6 +109,11 @@ def _target_weights(
                 scale = np.sqrt(np.maximum(np.diag(array), 1e-12))
                 cached_correlation = array / np.outer(scale, scale)
                 cached_columns = columns
+                cached_labels = (
+                    average_linkage_labels(cached_correlation, config.n_clusters)
+                    if config.use_cluster_weights
+                    else None
+                )
                 last_rebuild = i
         if cached_correlation is None or len(cached_columns) == 0:
             continue
@@ -71,6 +123,14 @@ def _target_weights(
         in_cache = np.searchsorted(cached_columns, usable)
         annual_vol = vol.iloc[i].to_numpy(dtype=float)[usable]
         correlation = cached_correlation[np.ix_(in_cache, in_cache)]
+        if config.use_cluster_weights and cached_labels is not None:
+            labels = cached_labels[in_cache]
+            vector[usable] *= equal_cluster_risk_multipliers(
+                correlation,
+                annual_vol,
+                labels,
+                np.ones(len(usable), dtype=bool),
+            )
         cov = correlation * np.outer(annual_vol, annual_vol)
         selected = vector[usable]
         risk = float(np.sqrt(max(selected @ cov @ selected, 0.0)))
@@ -109,12 +169,14 @@ def run_backtest(
     )
 
     positions = pd.DataFrame(0.0, index=opens.index, columns=opens.columns)
+    forward_frame, terminal_frame = forward_mark_returns(opens, closes)
     equity = config.initial_equity
     current = np.zeros(len(opens.columns), dtype=float)
     records: list[dict[str, float]] = []
     for i in range(len(opens) - 1):
         target = targets.iloc[i].to_numpy(dtype=float, copy=True)
         eligible = tradeable.iloc[i].to_numpy(dtype=bool)
+        can_execute = np.isfinite(opens.iloc[i].to_numpy(dtype=float))
         target = np.where(eligible, target, 0.0)
         gap = target - current
         # Buffer is expressed as a fraction of each desired weight. A target
@@ -123,15 +185,20 @@ def run_backtest(
         trade = np.where(np.abs(gap) > tolerance, gap - np.sign(gap) * tolerance, 0.0)
         trade = np.where((target == 0) & (current != 0), -current, trade)
         new_position = current + trade
+        # Buffering may retain pieces of yesterday's book while targets move.
+        # Hard portfolio constraints must bind the held book, not only the
+        # pre-buffer target.
+        held_gross = float(np.abs(new_position).sum())
+        if held_gross > config.max_gross_leverage:
+            new_position *= config.max_gross_leverage / held_gross
+
+        # A missing open cannot execute an otherwise desired rebalance.
+        new_position = np.where(can_execute, new_position, current)
 
         turnover = float(np.abs(new_position - current).sum())
         cost_return = turnover * config.cost_bps / 10_000.0
-        current_open = opens.iloc[i].to_numpy(dtype=float)
-        next_open = opens.iloc[i + 1].to_numpy(dtype=float)
-        current_close = closes.iloc[i].to_numpy(dtype=float)
-        terminal = ~np.isfinite(next_open) & np.isfinite(current_open) & np.isfinite(current_close)
-        end_mark = np.where(np.isfinite(next_open), next_open, current_close)
-        next_return = end_mark / current_open - 1.0
+        terminal = terminal_frame.iloc[i].to_numpy(dtype=bool)
+        next_return = forward_frame.iloc[i].to_numpy(dtype=float)
         # A disappearing contract is marked to its final observable close and
         # charged an explicit closing trade. It is not flattened for free on a
         # later row with no executable price.
@@ -159,12 +226,20 @@ def run_backtest(
                 "net_exposure": float(new_position.sum()),
             }
         )
-        current = np.where(terminal, 0.0, new_position)
+        # Holdings, unlike target weights, drift with their individual market
+        # returns. Express the resulting notionals as weights of next equity.
+        equity_factor = 1.0 + net_return
+        drifted = new_position * (1.0 + np.nan_to_num(next_return))
+        current = (
+            drifted / equity_factor
+            if np.isfinite(equity_factor) and equity_factor > 0
+            else np.zeros_like(drifted)
+        )
+        current = np.where(terminal, 0.0, current)
 
     daily = pd.DataFrame(records, index=opens.index[:-1])
     metrics = performance_metrics(daily, config)
     held = positions.iloc[:-1].to_numpy(dtype=float)
-    forward_frame = opens.shift(-1).where(opens.shift(-1).notna(), closes).div(opens).sub(1)
     forward = forward_frame.iloc[:-1].to_numpy(dtype=float)
     gross_by_market = np.nan_to_num(held * forward)
     funding_by_market = np.nan_to_num(

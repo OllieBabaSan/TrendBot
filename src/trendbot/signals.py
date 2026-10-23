@@ -9,7 +9,24 @@ from .config import TrendConfig
 def annualized_volatility(close: pd.DataFrame, config: TrendConfig) -> pd.DataFrame:
     """Volatility known at the current close; callers lag before execution."""
     log_return = np.log(close).diff()
-    daily = log_return.rolling(config.vol_window, min_periods=config.vol_window).std()
+    short = log_return.rolling(
+        config.vol_window, min_periods=config.vol_short_min_periods
+    ).std()
+    long = log_return.rolling(
+        config.vol_long_window, min_periods=config.vol_long_min_periods
+    ).std()
+    ewma = log_return.ewm(
+        span=config.vol_window, min_periods=config.vol_short_min_periods, adjust=False
+    ).std()
+    if config.vol_forecast == "long":
+        daily = long.where(long.notna(), short)
+    elif config.vol_forecast == "blend":
+        daily = config.vol_blend_short * short + (1 - config.vol_blend_short) * long
+        daily = daily.where(long.notna(), short)
+    elif config.vol_forecast == "ewma":
+        daily = ewma
+    else:
+        daily = short
     annual = daily * np.sqrt(config.annualization_days)
     return annual.clip(lower=config.vol_floor_annual)
 

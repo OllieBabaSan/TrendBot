@@ -1,10 +1,11 @@
 import unittest
+from dataclasses import replace
 
 import numpy as np
 import pandas as pd
 
 from trendbot.config import TrendConfig
-from trendbot.signals import response, trend_signal
+from trendbot.signals import annualized_volatility, response, trend_signal
 
 
 class SignalTests(unittest.TestCase):
@@ -41,6 +42,21 @@ class SignalTests(unittest.TestCase):
         )
         signal = trend_signal(close, TrendConfig())
         self.assertTrue(signal["YOUNG"].iloc[120:170].notna().any())
+
+    def test_blended_volatility_lies_between_short_and_long_forecasts(self):
+        index = pd.date_range("2020-01-01", periods=500, freq="D", tz="UTC")
+        returns = np.r_[np.full(250, 0.002), np.tile([0.05, -0.04], 125)]
+        close = pd.DataFrame({"X": 100 * np.exp(np.cumsum(returns))}, index=index)
+        base = TrendConfig(vol_short_min_periods=20, vol_long_min_periods=60)
+        short = annualized_volatility(close, replace(base, vol_forecast="short"))
+        long = annualized_volatility(close, replace(base, vol_forecast="long"))
+        blend = annualized_volatility(
+            close, replace(base, vol_forecast="blend", vol_blend_short=0.5)
+        )
+        low = min(float(short.iloc[-1, 0]), float(long.iloc[-1, 0]))
+        high = max(float(short.iloc[-1, 0]), float(long.iloc[-1, 0]))
+        self.assertGreaterEqual(float(blend.iloc[-1, 0]), low)
+        self.assertLessEqual(float(blend.iloc[-1, 0]), high)
 
 
 if __name__ == "__main__":
